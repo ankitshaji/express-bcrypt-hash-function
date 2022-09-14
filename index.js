@@ -143,7 +143,7 @@ app.post("/register", async (req, res) => {
 
 //route3
 //httpMethod=GET,path/resource- /secret -(direct match/exact path)
-//(READ) name-index,purpose-display all documents in (x)collection from (x)db
+//(READ) name-secret,purpose-display secret route only accessible if logged in
 //router.method(pathString ,handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
 //execute handlerMiddlwareCallback if (http structured) GET request arrives at path /secret
 //arguments passed in to handlerMiddlewareCallback -
@@ -155,6 +155,65 @@ app.get("/secret", (req, res) => {
     "You have accessed secret route, you cannot see this unless you are logged in"
   );
 });
+
+//route4
+//httpMethod=GET,path/resource- /login  -(direct match/exact path)
+//(READ) name-edit,purpose-display form to submit username and password into comparison post route
+//router.method(pathString ,handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
+//execute handlerMiddlwareCallback if (http structured) GET request arrives at path /register
+//arguments passed in to handlerMiddlewareCallback -
+//-if not already converted convert (http structured) request to req jsObject
+//-if not already created create res jsObject
+app.get("/login", (req, res) => {
+  res.render("login");
+});
+
+//route5
+//httpMethod=POST,path/resource- /login  -(direct match/exact path)
+//(CREATE) name-compare,purpose-compare existing document in (users)collection of (authentication-db)db
+//router.method(pathString ,async handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
+//execute handlerMiddlwareCallback if (http structured) POST request arrives at path /login
+//arguments passed in to handlerMiddlewareCallback -
+//-already converted (http structured) request to req jsObject - (http structured) request body contained form data,previous middlewareCallback parsed it to req.body
+//-if not already created create res jsObject
+//-nextCallback
+//async(ie continues running outside code if it hits an await inside) handlerMiddlwareCallback implicit returns promiseObject(resolved,undefined) - can await a promiseObject inside
+//async function expression without an await is just a normal syncronous function expression
+app.post(
+  "/login",
+  async (req, res, next) => {
+    //object keys to variable - Object destructuring
+    const { username, password } = req.body; //form data/req.body is jsObject //{key/name:inputValue,key/name:inputValue}}
+    // ***********************************************************
+    //READ - querying a collection(users) for a document by username
+    // ***********************************************************
+    //UserClassObject.method(queryObject) ie modelClassObject.method() - same as - db.campgrounds.findOne({username:"text"})
+    //returns thenableObject - pending to resolved(dataObject),rejected(errorObject)
+    //implicitly throws new Error("messageFromMongoose") if anything goes wrong during mongoose method
+    const foundUser = await UserClassObject.findOne({ username: username }); //foundUser = dataObject ie single first matching jsObject(document)
+    //username=test,password=monkey
+    //foundUser null value auto set by mongodb for valid format username not in collection - calling hashValuePassword property on null causes error
+    //note unlike before we do not give hint on why login failed - say incorrect username AND/OR incorrect password
+    //!null   = true
+    if (!foundUser) {
+      return next(); //return to not run rest of code //pass it to next middlewareCallback
+    }
+    //bcryptObject.method(recievedPasswordString,comparingHashValue) returns promiseObject pending(pending,undefined) to resolved(resolved,dataObject)
+    //validPassword is booleanObject - true - if same hashValue in database generated with extracted salt added onto recivedPasswordString ie same passwordStrings
+    const validPassword = await bcrypt.compare(
+      password,
+      foundUser.hashValuePassword
+    ); //validPassword is dataObject //booleanObject
+    if (validPassword) {
+      res.send("Logged in - Welcome");
+    } else {
+      next(); //pass it to next middlewareCallback
+    }
+  },
+  (req, res) => {
+    res.send("Incorrect username AND/OR incorrect password");
+  }
+);
 
 //address - localhost:3000
 //appObject.method(port,callback) binds app to port

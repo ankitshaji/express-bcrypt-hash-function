@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+  </head>
+  <body>
+    <h2>Login</h2>
+    <!--(http structured) POST request form-->
+    <!--form data not sent via ?queryString(can exist) but sent via request body (IMPORTANT SINCE IT MAKES PASSWORD VISIBLE )-->
+    <!--form data middlewareMethod of expressAppObject - converts request body into req.body-->
+    <!--ie jsObject-{key/name:inputValue,key/name:inputValue,key/name:inputValue}-->
+    <form action="/login" method="POST">
+      <div>
+        <!-- match for to id -->
+        <label for="username">Username:</label>
+        <input
+          type="text"
+          name="username"
+          id="username"
+          placeholder="username"
+        />
+      </div>
+      <div>
+        <!-- match for to id -->
+        <!--type attribute is password - just hides with dots - no client-side validation check-->
+        <label for="password">Password:</label>
+        <input
+          type="password"
+          name="password"
+          id="password"
+          placeholder="password"
+        />
+      </div>
+      <button>Login</button>
+    </form>
+  </body>
+</html>
