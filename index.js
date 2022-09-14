@@ -8,6 +8,7 @@ const app = express(); //appObject
 const mongoose = require("mongoose"); //mongooseObject //mongoose module
 const UserClassObject = require("./models/user"); //UserClassObject(ie Model) //self created module/file needs "./"
 const bcrypt = require("bcrypt"); //bcryptObject //bcrypt module
+const session = require("express-session"); //functionObject //express-session module
 
 // ********************************************************************************
 // CONNECT - nodeJS runtime app connects to default mogod server port + creates db
@@ -65,6 +66,45 @@ app.set("views", path.join(__dirname, "/views"));
 app.use(express.urlencoded({ extended: true })); //app.use(middlewareCallback) //app.use() lets us execute middlewareCallback on any http method/every (http structured) request to any path
 //middlewareCallback calls next() inside it to move to next middlewareCallback
 
+//(Third party)
+//middlewareCreationFunctionObject(argument) - argument is sessionOptionsObject
+//middlewareCreationFunctionObject execution creates middlewareCallback
+//Purpose:
+//case1-
+//On first (http strucuted) request, express-sessions middlewareCallback auto creates a session(jsObject) property on reqObject (associated to a newly created temporary data store)
+//it creates a new  sessionStore property on reqObject containing the temporary data store(MemoryStore)
+//it creates and pupulates sessionID property in reqObject with a unique sessionID
+//it creates a signed cookie with HMACValue (HMACValue is created from (req.sessionID + "secretString" + sha256HashFunction))
+//req.session.property is used to add the specifc clients data to the newly created temporary data store where id is current unique sessionID
+//it sets the signed cookie in the resObjects header (Set-Cookie:key:value)
+//case2-
+//On subsequent (http strucutred) requests from same client contain signed cookie in its header (Cookie:key:value)
+//express-sessions middlewareCallback unsigns the cookies HMACValue to get the unique sessionID associate to that unique client
+//it creates and pupulates sessionID property in reqObject with the current unique sessionID of client
+//it creates a session(jsObject) property on reqObject (assoicated with the pre existing temporary data store)
+//it creates a sessionStore property on reqObject containing the pre existing temporary data store(MemoryStore)
+//req.session.property is used to retrive the specfic clients stored data from the pre existing temporary data store where id is current unique sessionID from signed cookie received from unique client
+//it creates signed cookie with HMACValue (HMACValue is created from (req.sessionID + "secretString" + sha256HashFunction))
+//it sets this signed cookie in the resObjects header (Set-Cookie:key:value)
+//sidenode - (http structure) request could be from unique browserClients or unique postmanClients
+const sessionOptionsObject = {
+  secret: "thisismysecret",
+  saveUninitialized: true,
+  resave: false,
+  cookie: {
+    //default true //cannot access signed cookie in client side script - minimize damage of (XSS)cross-site scripting attack
+    httpOnly: true,
+    //milliseconds time now + milliseconds time in a week
+    expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+  },
+};
+//saveUninitialized - save a newly created session to data store even if session was not modified during the request
+//resave - save non updated session to data store even if session was not modified during the request
+//cookies - properties of created/receieved signed cookies
+app.use(session(sessionOptionsObject)); //app.use(middlewareCallback) //app.use() lets us execute middlewareCallback on any http method/every (http structured) request to any path
+//middlewareCallback calls next() inside it to move to next middlewareCallback
+
 // ***************************************************************************************************************************************************************
 //Using RESTful webApi crud operations pattern (route/pattern matching algorithm - order matters) + MongoDB CRUD Operations using mongoose-ODM (modelClassObject)
 // ***************************************************************************************************************************************************************
@@ -80,6 +120,7 @@ app.use(express.urlencoded({ extended: true })); //app.use(middlewareCallback) /
 //-nextCallback
 app.get("/", (req, res) => {
   res.send("This is home page");
+  //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
 });
 
 //*************
@@ -97,6 +138,10 @@ app.get("/", (req, res) => {
 //-nextCallback
 app.get("/register", (req, res) => {
   res.render("register");
+  //responseObject.render(ejs filePath,variableObject) - sends variable to ejs file - executes js - converts ejs file into pure html
+  //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+  //responseObject.render() - converts and sends res jsObject as (http structure)response //content-type:text/html
+  //thus ending request-response cycle
 });
 
 //route2
@@ -134,11 +179,15 @@ app.post("/register", async (req, res) => {
   //creates (users)collection in (authentication-db)db if not existing already and adds (newUser)document into the (authentication-db)collection
   //implicitly throws new Error("messageFromMongoose") - break validation contraints
   const savedUser = await newUser.save(); //savedUser = dataObject ie created jsObject(document)
-  res.redirect("/");
-  //responseObject.redirect("rootPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /
-  //responseObject.redirect("rootPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
+  //savedUser wont be null
+  //create a userId property on current sessionObject ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID
+  req.session.userId = savedUser._id; //userId is usefull for later collection look ups for current user
+  res.redirect("/secret");
+  //responseObject.redirect("secretPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /secret
+  //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+  //responseObject.redirect("secretPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
   //thus ending request-response cycle
-  //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get) /
+  //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get) /secret
 });
 
 //route3
@@ -151,9 +200,24 @@ app.post("/register", async (req, res) => {
 //-if not already created create res jsObject
 //-nextCallback
 app.get("/secret", (req, res) => {
+  //retriving a userId property on current sessionObject ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID
+  //if no userId property stored in current sessionObject ie not logged in
+  if (!req.session.userId) {
+    return res.redirect("/login"); //return to skip rest of code - else respond twice error occurs - "Cannot set headrs afther they are sent to client"
+    //responseObject.redirect("loginPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /login
+    //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+    //responseObject.redirect("loginPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
+    //thus ending request-response cycle
+    //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
+  }
+  //else ther is userId stored in sessionObject ie logged in
   res.send(
     "You have accessed secret route, you cannot see this unless you are logged in"
   );
+  //responseObject.send("String")
+  //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+  //responseObject.send() - converts and sends res jsObject as (http structure)response //content-type:text/plain
+  //thus ending request-response cycle
 });
 
 //route4
@@ -166,6 +230,10 @@ app.get("/secret", (req, res) => {
 //-if not already created create res jsObject
 app.get("/login", (req, res) => {
   res.render("login");
+  //responseObject.render(ejs filePath,variableObject) - sends variable to ejs file - executes js - converts ejs file into pure html
+  //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+  //responseObject.render() - converts and sends res jsObject as (http structure)response //content-type:text/html
+  //thus ending request-response cycle
 });
 
 //route5
@@ -205,13 +273,25 @@ app.post(
       foundUser.hashValuePassword
     ); //validPassword is dataObject //booleanObject
     if (validPassword) {
-      res.send("Logged in - Welcome");
+      //create a userId property on current sessionObject ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID
+      req.session.userId = foundUser._id; //userId is usefull for later collection look ups for current user
+      res.redirect("/secret");
+      //responseObject.redirect("secretPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /secret
+      //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+      //responseObject.redirect("secretPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
+      //thus ending request-response cycle
+      //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/secret
     } else {
       next(); //pass it to next middlewareCallback
     }
   },
   (req, res) => {
-    res.send("Incorrect username AND/OR incorrect password");
+    res.redirect("/login");
+    //responseObject.redirect("loginPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /login
+    //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+    //responseObject.redirect("loginPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
+    //thus ending request-response cycle
+    //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
   }
 );
 
