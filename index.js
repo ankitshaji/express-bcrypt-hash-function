@@ -180,7 +180,7 @@ app.post("/register", async (req, res) => {
   //implicitly throws new Error("messageFromMongoose") - break validation contraints
   const savedUser = await newUser.save(); //savedUser = dataObject ie created jsObject(document)
   //savedUser wont be null
-  //create a userId property on current sessionObject ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID
+  //create a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
   req.session.userId = savedUser._id; //userId is usefull for later collection look ups for current user
   res.redirect("/secret");
   //responseObject.redirect("secretPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /secret
@@ -192,7 +192,7 @@ app.post("/register", async (req, res) => {
 
 //route3
 //httpMethod=GET,path/resource- /secret -(direct match/exact path)
-//(READ) name-secret,purpose-display secret route only accessible if logged in
+//(READ) name-secret,purpose- secret ejs template only rendered if logged in - secret ejs template allows us to logout
 //router.method(pathString ,handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
 //execute handlerMiddlwareCallback if (http structured) GET request arrives at path /secret
 //arguments passed in to handlerMiddlewareCallback -
@@ -200,7 +200,7 @@ app.post("/register", async (req, res) => {
 //-if not already created create res jsObject
 //-nextCallback
 app.get("/secret", (req, res) => {
-  //retriving a userId property on current sessionObject ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID
+  //retriving a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
   //if no userId property stored in current sessionObject ie not logged in
   if (!req.session.userId) {
     return res.redirect("/login"); //return to skip rest of code - else respond twice error occurs - "Cannot set headrs afther they are sent to client"
@@ -210,13 +210,12 @@ app.get("/secret", (req, res) => {
     //thus ending request-response cycle
     //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
   }
-  //else ther is userId stored in sessionObject ie logged in
-  res.send(
-    "You have accessed secret route, you cannot see this unless you are logged in"
-  );
-  //responseObject.send("String")
+  //else there is userId stored in sessionObject ie logged in
+  //res.send("You have accessed secret route, you cannot see this unless you are logged in");
+  res.render("secret");
+  //responseObject.render(ejs filePath,variableObject) - sends variable to ejs file - executes js - converts ejs file into pure html
   //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
-  //responseObject.send() - converts and sends res jsObject as (http structure)response //content-type:text/plain
+  //responseObject.render() - converts and sends res jsObject as (http structure)response //content-type:text/html
   //thus ending request-response cycle
 });
 
@@ -273,7 +272,7 @@ app.post(
       foundUser.hashValuePassword
     ); //validPassword is dataObject //booleanObject
     if (validPassword) {
-      //create a userId property on current sessionObject ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID
+      //create a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
       req.session.userId = foundUser._id; //userId is usefull for later collection look ups for current user
       res.redirect("/secret");
       //responseObject.redirect("secretPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /secret
@@ -294,6 +293,29 @@ app.post(
     //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
   }
 );
+
+//route6
+//httpMethod=POST,path/resource- /logout  -(direct match/exact path)
+//(CREATE) name-delete,purpose-delete sessionObject or set userId property on sessionObject to null
+//router.method(pathString ,handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
+//execute handlerMiddlwareCallback if (http structured) POST request arrives at path /logout
+//arguments passed in to handlerMiddlewareCallback -
+//-already converted (http structured) request to req jsObject - (http structured) request body contained form data,previous middlewareCallback parsed it to req.body
+//-if not already created create res jsObject
+//-nextCallback
+app.post("/logout", (req, res) => {
+  //retrieve userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
+  //update userId property on current sessionObject to null - now cant pass if check in secret route - lost access
+  req.session.userId = null;
+  //alternatively -
+  //req.session.destroy(); // sessionObject property on reqObject is deleted completly ie(undefined) - therefore all properties on sessionObject are gone
+  res.redirect("/login");
+  //responseObject.redirect("loginPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /login
+  //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+  //responseObject.redirect("loginPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
+  //thus ending request-response cycle
+  //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
+});
 
 //address - localhost:3000
 //appObject.method(port,callback) binds app to port
