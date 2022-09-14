@@ -12,7 +12,7 @@ const SchemaClassObject = mongoose.Schema; //SchemaClassObject
 //objectArgument-{key:nodejs value type} for collection {keys:value}
 //creating userSchemaInstanceObject - with new keyword and schemaClassObject constructor method
 //setting validtaions/constraints in object - shorthand vs longhand - [string] vs [{properties}] and String vs {type:String,required:true}
-///cannot ommit username property,cannot ommit hashValuePassword property ,addtional key:values get neglected(no error)
+//cannot ommit username property,cannot ommit hashValuePassword property ,addtional key:values get neglected(no error)
 //we can set some custom words in messageFromMongoose when implicit throw new Error("messageFromMongoose") occurs
 const userSchemaInstanceObject = new SchemaClassObject({
   username: { type: String, required: [true, "Username cannot be blank"] },
