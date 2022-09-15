@@ -178,9 +178,6 @@ app.get("/register", (req, res) => {
 app.post("/register", async (req, res) => {
   //object keys to variable - Object destructuring
   const { username, password } = req.body; //form data/req.body is jsObject //{key/name:inputValue,key/name:inputValue}}
-  //bcryptObject.method(passordString,saltRound) returns promiseObject pending(pending,undefined) to resolved(resolved,dataObject)
-  //hashValue is stringObject ,ie-computed hashValue of passwordStringWithSalt - (note - hashValue always random due to randomValue salt)
-  const hashValue = await bcrypt.hash(password, 12);
   // ***************************************************************************************
   //CREATE - creating a single new document in the (users) collection of (authentication-db)db
   // ***************************************************************************************
@@ -193,12 +190,14 @@ app.post("/register", async (req, res) => {
   //create modelInstanceObject(ie document) - with new keyword and UserClassObject constructor method
   const newUser = UserClassObject({
     username,
-    hashValuePassword: hashValue,
+    hashValuePassword: password,
   });
-  //modelInstance.save() returns promiseObject - pending to resolved(dataObject),rejected(errorObject) ie(breaking validation/contraints)
+  //modelInstanceObject.save() returns promiseObject - pending to resolved(dataObject),rejected(errorObject) ie(breaking validation/contraints)
   //creates (users)collection in (authentication-db)db if not existing already and adds (newUser)document into the (authentication-db)collection
   //implicitly throws new Error("messageFromMongoose") - break validation contraints
   const savedUser = await newUser.save(); //savedUser = dataObject ie created jsObject(document)
+  //exectue pre/post async modelInstanceMiddlewareCallback when modelFunction(mongoose method) is called
+  //we set up a mongoose pre async modelInstanceMiddlewareCallback for the save mongoose method
   //savedUser wont be null
   //create a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
   req.session.userId = savedUser._id; //userId is usefull for later collection look ups for current user
@@ -274,45 +273,25 @@ app.get("/login", (req, res) => {
 //-nextCallback
 //async(ie continues running outside code if it hits an await inside) handlerMiddlwareCallback implicit returns promiseObject(resolved,undefined) - can await a promiseObject inside
 //async function expression without an await is just a normal syncronous function expression
-app.post(
-  "/login",
-  async (req, res, next) => {
-    //object keys to variable - Object destructuring
-    const { username, password } = req.body; //form data/req.body is jsObject //{key/name:inputValue,key/name:inputValue}}
-    // ***********************************************************
-    //READ - querying a collection(users) for a document by username
-    // ***********************************************************
-    //UserClassObject.method(queryObject) ie modelClassObject.method() - same as - db.campgrounds.findOne({username:"text"})
-    //returns thenableObject - pending to resolved(dataObject),rejected(errorObject)
-    //implicitly throws new Error("messageFromMongoose") if anything goes wrong during mongoose method
-    const foundUser = await UserClassObject.findOne({ username: username }); //foundUser = dataObject ie single first matching jsObject(document)
-    //username=test,password=monkey
-    //foundUser null value auto set by mongodb for valid format username not in collection - calling hashValuePassword property on null causes error
-    //note unlike before we do not give hint on why login failed - say incorrect username AND/OR incorrect password
-    //!null   = true
-    if (!foundUser) {
-      return next(); //return to not run rest of code //pass it to next middlewareCallback
-    }
-    //bcryptObject.method(recievedPasswordString,comparingHashValue) returns promiseObject pending(pending,undefined) to resolved(resolved,dataObject)
-    //validPassword is booleanObject - true - if same hashValue in database generated with extracted salt added onto recivedPasswordString ie same passwordStrings
-    const validPassword = await bcrypt.compare(
-      password,
-      foundUser.hashValuePassword
-    ); //validPassword is dataObject //booleanObject
-    if (validPassword) {
-      //create a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
-      req.session.userId = foundUser._id; //userId is usefull for later collection look ups for current user
-      res.redirect("/secret");
-      //responseObject.redirect("secretPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /secret
-      //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
-      //responseObject.redirect("secretPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
-      //thus ending request-response cycle
-      //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/secret
-    } else {
-      next(); //pass it to next middlewareCallback
-    }
-  },
-  (req, res) => {
+app.post("/login", async (req, res, next) => {
+  //object keys to variable - Object destructuring
+  const { username, password } = req.body; //form data/req.body is jsObject //{key/name:inputValue,key/name:inputValue}}
+  //UserClassObject(ie modelClassObject).customStaticMethod(arg1,arg2)
+  //this keyword refers to modelClassObject //left of dot (execution scope)
+  //returns thenableObject - pending to resolved(dataObject),rejected(errorObject)
+  const foundUserOrFalse =
+    await UserClassObject.findByUsernameAndValidatePassword(username, password); //foundUserOrFalse is dataObject //dataObejct is userObject or False
+  //userObject = true, false = false
+  if (foundUserOrFalse) {
+    //create a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
+    req.session.userId = foundUserOrFalse._id; //userId is usefull for later collection look ups for current user
+    res.redirect("/secret");
+    //responseObject.redirect("secretPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /secret
+    //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+    //responseObject.redirect("secretPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
+    //thus ending request-response cycle
+    //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/secret
+  } else {
     res.redirect("/login");
     //responseObject.redirect("loginPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /login
     //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
@@ -320,7 +299,7 @@ app.post(
     //thus ending request-response cycle
     //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
   }
-);
+});
 
 //route7
 //httpMethod=POST,path/resource- /logout  -(direct match/exact path)
