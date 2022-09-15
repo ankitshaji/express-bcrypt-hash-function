@@ -105,6 +105,23 @@ const sessionOptionsObject = {
 app.use(session(sessionOptionsObject)); //app.use(middlewareCallback) //app.use() lets us execute middlewareCallback on any http method/every (http structured) request to any path
 //middlewareCallback calls next() inside it to move to next middlewareCallback
 
+//(custom middlewareCallback)
+//use in specific routes ie specific method and specific path
+const loggedinCheck = (req, res, next) => {
+  //retriving a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
+  //if no userId property stored in current sessionObject ie not logged in
+  if (!req.session.userId) {
+    return res.redirect("/login"); //return to skip rest of code - else respond twice error occurs - "Cannot set headrs afther they are sent to client"
+    //responseObject.redirect("loginPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /login
+    //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+    //responseObject.redirect("loginPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
+    //thus ending request-response cycle
+    //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
+  }
+  //else there is userId stored in sessionObject ie logged in
+  next(); //pass to next middlewareCallback to access specific route logged in contenet
+};
+
 // ***************************************************************************************************************************************************************
 //Using RESTful webApi crud operations pattern (route/pattern matching algorithm - order matters) + MongoDB CRUD Operations using mongoose-ODM (modelClassObject)
 // ***************************************************************************************************************************************************************
@@ -120,7 +137,10 @@ app.use(session(sessionOptionsObject)); //app.use(middlewareCallback) //app.use(
 //-nextCallback
 app.get("/", (req, res) => {
   res.send("This is home page");
+  //responseObject.send("stringObject")
   //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+  //responseObject.send() - converts and sends res jsObject as (http structure)response //content-type:text/plain
+  //thus ending request-response cycle
 });
 
 //*************
@@ -199,18 +219,7 @@ app.post("/register", async (req, res) => {
 //-if not already converted convert (http structured) request to req jsObject
 //-if not already created create res jsObject
 //-nextCallback
-app.get("/secret", (req, res) => {
-  //retriving a userId property on current sessionObject (ie using sessionObject.property to add/retrive the specifc clients data to/from the new/pre existing temporary data store where id is current unique sessionID)
-  //if no userId property stored in current sessionObject ie not logged in
-  if (!req.session.userId) {
-    return res.redirect("/login"); //return to skip rest of code - else respond twice error occurs - "Cannot set headrs afther they are sent to client"
-    //responseObject.redirect("loginPath") updates res.header, sets res.statusCode to 302-found ie-redirect ,sets res.location to /login
-    //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
-    //responseObject.redirect("loginPath") - converts and sends res jsObject as (http structure)response // default content-type:text/html
-    //thus ending request-response cycle
-    //browser sees (http structured) response with headers and makes a (http structured) GET request to location ie default(get)/login
-  }
-  //else there is userId stored in sessionObject ie logged in
+app.get("/secret", loggedinCheck, (req, res) => {
   //res.send("You have accessed secret route, you cannot see this unless you are logged in");
   res.render("secret");
   //responseObject.render(ejs filePath,variableObject) - sends variable to ejs file - executes js - converts ejs file into pure html
@@ -220,6 +229,25 @@ app.get("/secret", (req, res) => {
 });
 
 //route4
+//httpMethod=GET,path/resource- /secret -(direct match/exact path)
+//(READ) name-secret,purpose- secret ejs template only rendered if logged in - secret ejs template allows us to logout
+//router.method(pathString ,handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
+//execute handlerMiddlwareCallback if (http structured) GET request arrives at path /secret
+//arguments passed in to handlerMiddlewareCallback -
+//-if not already converted convert (http structured) request to req jsObject
+//-if not already created create res jsObject
+//-nextCallback
+app.get("/topsecret", loggedinCheck, (req, res) => {
+  res.send(
+    "You have accessed topsecret route, you cannot see this unless you are logged in"
+  );
+  //responseObject.send("stringObject")
+  //resObjects header contains signed cookie created/set by express-sessions middlewareCallback
+  //responseObject.send() - converts and sends res jsObject as (http structure)response //content-type:text/plain
+  //thus ending request-response cycle
+});
+
+//route5
 //httpMethod=GET,path/resource- /login  -(direct match/exact path)
 //(READ) name-edit,purpose-display form to submit username and password into comparison post route
 //router.method(pathString ,handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
@@ -235,7 +263,7 @@ app.get("/login", (req, res) => {
   //thus ending request-response cycle
 });
 
-//route5
+//route6
 //httpMethod=POST,path/resource- /login  -(direct match/exact path)
 //(CREATE) name-compare,purpose-compare existing document in (users)collection of (authentication-db)db
 //router.method(pathString ,async handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
@@ -294,7 +322,7 @@ app.post(
   }
 );
 
-//route6
+//route7
 //httpMethod=POST,path/resource- /logout  -(direct match/exact path)
 //(CREATE) name-delete,purpose-delete sessionObject or set userId property on sessionObject to null
 //router.method(pathString ,handlerMiddlewareCallback) lets us execute handlerMiddlewareCallback on specifid http method/every (http structured) request to specified path/resource
